@@ -1,0 +1,129 @@
+Microsoft (R) Macro Assembler Version 6.11		    11/01/25 15:33:57
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT    
+ 0000				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           
+ 0003  8E D8			    MOV DS,AX                
+ 0005				L:         ; 主循环体
+ 0005  E8 0013			    call input_dec
+ 0008  E8 0037			    call bin_to_hex 
+ 000B  E8 0002			    call crlf      
+ 000E  EB F5			    jmp L  ; 循环实现连续输入
+
+				; 回车换行子程序
+ 0010				crlf proc near
+ 0010  B4 02			    mov ah, 2       
+ 0012  B2 0D			    mov dl, 13      
+ 0014  CD 21			    int 21h
+ 0016  B2 0A			    mov dl, 10      
+ 0018  CD 21			    int 21h
+ 001A  C3			    ret
+ 001B				crlf endp
+
+				; 十进制转二进制子程序
+ 001B				input_dec proc near
+ 001B  BB 0000			    mov bx, 0       
+ 001E				read_digit:
+ 001E  B4 01			    mov ah, 1       ; 字符输入
+ 0020  CD 21			    int 21h         
+				    
+ 0022  3C 1B			    cmp al, 27      
+ 0024  74 39			    je exit         ; 输入为ESC，跳转至程序结束
+				    
+ 0026  3C 30			    cmp al, '0'     ; 检查是否为'0'~'9'，不符合条件结束输入
+ 0028  7C 17			    jl input_end    
+ 002A  3C 39			    cmp al, '9'
+ 002C  7F 13			    jg input_end    
+				    
+ 002E  2C 30			    sub al, 30h     ; 将ASCII码转换为数值（0-9）
+ 0030  B4 00			    mov ah, 0       
+ 0032  50			    push ax        
+ 0033  8B C3			    mov ax, bx     
+				    
+				    ; 计算数值
+ 0035  B9 000A			    mov cx, 10    
+ 0038  F7 E1			    mul cx       
+ 003A  8B D8			    mov bx, ax     
+ 003C  58			    pop ax          
+ 003D  03 D8			    add bx, ax         
+ 003F  EB DD			    jmp read_digit  ; 继续读取下一位数字
+ 0041				input_end:
+ 0041  C3			    ret
+ 0042				input_dec endp
+
+
+				; 二进制转十六进制子程序
+ 0042				bin_to_hex proc near
+ 0042  B5 04			    mov ch, 4       ; 设置循环4次
+ 0044				rotate:
+ 0044  B1 04			    mov cl, 4       ; 循环移位处理
+ 0046  D3 C3			    rol bx, cl      
+ 0048  8A C3			    mov al, bl     
+ 004A  24 0F			    and al, 0fh    
+ 004C  04 30			    add al, 30h     
+ 004E  3C 3A			    cmp al, 3ah    
+ 0050  7C 02			    jl printit      
+ 0052  04 07			    add al, 7h      
+ 0054				printit:
+ 0054  8A D0			    mov dl, al      ; 输出对应字符
+ 0056  B4 02			    mov ah, 2      
+ 0058  CD 21			    int 21h       
+ 005A  FE CD			    dec ch         
+ 005C  75 E6			    jnz rotate      
+ 005E  C3			    ret
+ 005F				bin_to_hex endp
+
+				; 程序结束处理
+ 005F				exit:
+ 005F  B4 4C			    mov ah, 4ch    
+ 0061  CD 21			    int 21h        
+ 0063				CODES ENDS
+				    END START       
+
+Microsoft (R) Macro Assembler Version 6.11		    11/01/25 15:33:57
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0063	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+bin_to_hex . . . . . . . . . . .	P Near	 0042	  CODES	Length= 001D Public
+  rotate . . . . . . . . . . . .	L Near	 0044	  CODES	
+  printit  . . . . . . . . . . .	L Near	 0054	  CODES	
+crlf . . . . . . . . . . . . . .	P Near	 0010	  CODES	Length= 000B Public
+input_dec  . . . . . . . . . . .	P Near	 001B	  CODES	Length= 0027 Public
+  read_digit . . . . . . . . . .	L Near	 001E	  CODES	
+  input_end  . . . . . . . . . .	L Near	 0041	  CODES	
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L  . . . . . . . . . . . . . . .	L Near	 0005	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+exit . . . . . . . . . . . . . .	L Near	 005F	  CODES	
+
+	   0 Warnings
+	   0 Errors

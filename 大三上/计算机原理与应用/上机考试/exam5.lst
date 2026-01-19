@@ -1,0 +1,139 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/29/25 01:10:21
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ; 预设字符串数组：共10个4字符字符串（data/name等），以'$'标记数组逻辑结束（用于对比和显示）
+ 0000 64 61 74 61 6E 61		    object db 'data','name','time','file','code','path','user','exit','quit','text','$'
+       6D 65 74 69 6D 65
+       66 69 6C 65 63 6F
+       64 65 70 61 74 68
+       75 73 65 72 65 78
+       69 74 71 75 69 74
+       74 65 78 74 24
+ 0029 0A			    input_max db 10        ; 输入缓冲区：最大可输入字符数（预留10字节，实际需输入4个字符）
+ 002A 00			    input_real db ?        ; 实际输入字符数（由DOS 0AH功能调用自动填充，记录输入长度）
+ 002B  000A [			    input db 10 dup(?)     ; 存储用户输入的4字符字符串（以ASCII码形式保存）
+        00
+       ]
+ 0035  0064 [			    output db 100 dup(?)   ; 存储最终输出结果（不包含匹配字符串，含逗号分隔，预留足够空间）
+        00
+       ]
+ 0099				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段（未定义具体栈空间，使用系统默认堆栈存储子程序调用上下文）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS  ; 关联段寄存器：CS指向代码段，DS指向数据段，SS指向堆栈段
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 数据段基地址送入AX（DS不能直接赋值，需通过AX中转）
+ 0003  8E D8			    MOV DS,AX              ; 初始化数据段寄存器DS，确保后续能正确访问数据段中的变量
+ 0005  8D 16 0029 R		    lea dx, input_max      ; 取输入缓冲区首地址（input_max）送入dx，为DOS输入功能做准备
+ 0009  B4 0A			    mov ah, 0ah            ; 设置DOS功能调用号为0AH（带缓冲区的键盘输入功能）
+ 000B  CD 21			    int 21h                ; 执行DOS中断：用户输入的4字符存入input，实际输入长度存入input_real
+ 000D  E8 0067			    call crlf              ; 调用换行子程序，分隔输入操作与输出结果，优化屏幕显示
+
+				    ; 初始化寄存器：为字符串对比、删除（不写入输出）、结果拼接做准备
+ 0010  BE 0000			    mov si, 0              ; si=输入字符串（input）的字符索引（0-3，对应4个字符，逐位对比）
+ 0013  BB 0000			    mov bx, 0              ; bx=预设数组（object）的偏移量（每次+4，指向当前待对比的4字符字符串）
+ 0016  B9 000A			    mov cx, 10             ; cx=循环次数（预设数组共10个4字符字符串，需逐个对比处理）
+ 0019  BF 0000			    mov di, 0              ; di=输出缓冲区（output）的地址索引（每次+5，4字符+1分隔符，用于拼接结果）
+
+ 001C				L1:                        ; 循环入口：逐个对比输入字符串与预设数组中的4字符字符串
+ 001C  8A 84 002B R		    mov al, input[si]      ; 取输入字符串当前索引（si）的字符，存入al（用于对比）
+ 0020  3A 80 0000 R		    cmp al, object[si+bx]  ; 对比输入字符与预设字符串当前位置（si+bx）的字符
+ 0024  75 08			    jnz next               ; 若字符不匹配，跳至next（将当前预设字符串写入输出缓冲区）
+				    
+ 0026  46			    inc si                 ; 字符匹配，si索引+1（准备对比下一个字符）
+ 0027  83 FE 04			    cmp si, 4              ; 判断是否已对比完4个字符（si=4表示输入与当前预设字符串全匹配）
+ 002A  74 2F			    je L4                  ; 若全匹配，跳至L4（不写入输出，实现“删除”效果）
+ 002C  EB EE			    jmp L1                 ; 未对比完4个字符，继续循环对比
+
+ 002E				next:                      ; 字符不匹配：将当前预设字符串完整写入输出缓冲区
+ 002E  8A 87 0000 R		    mov al, object[bx]     ; 取预设字符串第1个字符（bx偏移位置）
+ 0032  88 85 0035 R		    mov output[di], al     
+ 0036  8A 87 0001 R		    mov al, object[bx+1]   ; 取预设字符串第2个字符（bx+1偏移位置）
+ 003A  88 85 0036 R		    mov output[di+1], al 
+ 003E  8A 87 0002 R		    mov al, object[bx+2]   ; 取预设字符串第3个字符（bx+2偏移位置）
+ 0042  88 85 0037 R		    mov output[di+2], al 
+ 0046  8A 87 0003 R		    mov al, object[bx+3]   ; 取预设字符串第4个字符（bx+3偏移位置）
+ 004A  88 85 0038 R		    mov output[di+3], al     
+
+ 004E				L2:                        ; 处理输出字符串间的分隔符（逗号）：除最后一个字符串外，均加逗号
+ 004E  83 F9 01			    cmp cx, 1              ; 判断是否为预设数组的最后一个字符串（cx=1表示最后一个）
+ 0051  74 05			    je L3                  ; 若是最后一个，不加分隔符，跳至L3
+ 0053  C6 85 0039 R 2C		    mov output[di+4], ','  ; 不是最后一个，在4字符后加逗号（di+4位置存','，分隔字符串）
+
+ 0058				L3:                        ; 更新输出缓冲区索引：为下一个字符串（若有）预留位置
+ 0058  83 C7 05			    add di, 5              ; di+5（4字符+1分隔符，即使最后一个无分隔符，不影响后续结束符）
+
+ 005B				L4:                        ; 更新预设数组偏移与输入索引：准备处理下一个预设字符串
+ 005B  83 C3 04			    add bx, 4              ; bx+4（指向预设数组下一个4字符字符串，每个字符串占4字节）
+ 005E  BE 0000			    mov si, 0              ; si重置为0（下一轮对比从输入字符串第1个字符开始）
+ 0061  E2 B9			    loop L1                ; cx计数器-1，若cx≠0则继续循环，直至所有预设字符串处理完成
+
+				    ; 输出最终结果（不含匹配字符串，以逗号分隔剩余字符串）
+ 0063  C6 85 0035 R 24		    mov output[di], '$'    ; 在输出缓冲区末尾加'$'（DOS 09H功能的字符串结束标志，必须添加）
+ 0068  8D 16 0035 R		    lea dx, output         ; 取输出缓冲区首地址送入dx，为DOS显示功能做准备
+ 006C  B4 09			    mov ah, 09h            ; 设置DOS功能调用号为09H（显示以'$'结尾的字符串）
+ 006E  CD 21			    int 21h                ; 执行DOS中断，在屏幕上显示删除匹配字符串后的结果
+ 0070  E8 0004			    call crlf              ; 调用换行子程序，保持显示格式整洁
+
+				    ; 程序正常结束，返回DOS系统
+ 0073  B4 4C			    MOV AH,4CH             ; 设置DOS功能调用号为4CH（程序退出并释放资源）
+ 0075  CD 21			    INT 21H                ; 执行DOS中断，返回DOS环境
+
+				; 子程序：crlf - 实现屏幕换行（输出回车符+换行符，规范显示格式）
+ 0077				crlf proc near            ; 定义近过程（仅在当前代码段内调用，节省内存）
+ 0077  B2 0D			    mov dl, 13             ; dl=回车符ASCII码（13），使光标回到当前行开头
+ 0079  B4 02			    mov ah, 02h            ; 设置DOS功能调用号为02H（单个字符输出功能）
+ 007B  CD 21			    int 21h                ; 执行DOS中断，输出回车符
+ 007D  B2 0A			    mov dl, 10             ; dl=换行符ASCII码（10），使光标下移一行
+ 007F  B4 02			    mov ah, 02h            ; 再次设置单个字符输出功能
+ 0081  CD 21			    int 21h                ; 执行DOS中断，输出换行符
+ 0083  C3			    ret                    ; 子程序返回，回到调用处继续执行后续代码
+ 0084				crlf endp                 ; 子程序定义结束
+ 0084				CODES ENDS
+				    END START              ; 汇编程序结束，指定程序入口为START标签（告诉编译器从这里开始执行）
+Microsoft (R) Macro Assembler Version 6.11		    10/29/25 01:10:21
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0084	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0099	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 0077	  CODES	Length= 000D Public
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L1 . . . . . . . . . . . . . . .	L Near	 001C	  CODES	
+L2 . . . . . . . . . . . . . . .	L Near	 004E	  CODES	
+L3 . . . . . . . . . . . . . . .	L Near	 0058	  CODES	
+L4 . . . . . . . . . . . . . . .	L Near	 005B	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+input_max  . . . . . . . . . . .	Byte	 0029	  DATAS	
+input_real . . . . . . . . . . .	Byte	 002A	  DATAS	
+input  . . . . . . . . . . . . .	Byte	 002B	  DATAS	
+next . . . . . . . . . . . . . .	L Near	 002E	  CODES	
+object . . . . . . . . . . . . .	Byte	 0000	  DATAS	
+output . . . . . . . . . . . . .	Byte	 0035	  DATAS	
+
+	   0 Warnings
+	   0 Errors

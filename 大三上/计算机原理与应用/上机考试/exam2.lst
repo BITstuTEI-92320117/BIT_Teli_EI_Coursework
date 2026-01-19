@@ -1,0 +1,105 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/28/25 23:39:33
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+ 0000 FF			    input_max db 255       ; 输入缓冲区：最大可输入字符数（255个，满足长字符串需求）
+ 0001 00			    input_real db ?        ; 实际输入字符数（由DOS 0AH功能调用自动填充，记录有效字符长度）
+ 0002  00FF [			    input db 255 dup(?)    ; 存储用户输入的原始字符串（以ASCII码形式保存）
+        00
+       ]
+ 0101  01FF [			    output db 511 dup(?)   ; 存储处理后的字符串（预留足够空间，与输入长度匹配）
+        00
+       ]
+ 0300				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段（未定义具体栈空间，使用系统默认堆栈存储子程序调用上下文）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS  ; 关联段寄存器与对应段
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 将数据段地址送入AX（因DS不能直接赋值，需通过AX中转）
+ 0003  8E D8			    MOV DS,AX              ; 初始化数据段寄存器DS，使其指向DATAS段
+ 0005  8D 16 0000 R		    lea dx, input_max      ; 取输入缓冲区首地址（input_max）送入dx，为DOS输入做准备
+ 0009  B4 0A			    mov ah, 0ah            ; 设置DOS功能调用号为0AH（带缓冲区的键盘输入功能）
+ 000B  CD 21			    int 21h                ; 执行DOS中断，用户输入的字符串存入input，实际长度存入input_real
+ 000D  E8 0032			    call crlf              ; 调用换行子程序，分隔输入操作与输出结果，优化显示效果
+				    
+				    ; 初始化循环参数与指针，准备处理字符串
+ 0010  8A 0E 0001 R		    mov cl, input_real     ; 循环计数器CX的低8位（CL）设为实际输入字符数，控制循环次数
+ 0014  B5 00			    mov ch, 0              ; CX的高8位（CH）清零，确保CX整体为实际字符数（无符号数）
+ 0016  8D 36 0002 R		    lea si, input          ; 源变址寄存器SI指向输入字符串（input）的起始位置，用于读取原始字符
+ 001A  8D 3E 0101 R		    lea di, output         ; 目标变址寄存器DI指向输出字符串（output）的起始位置，用于存储处理后字符
+ 001E				L:                        ; 循环入口：逐字符处理输入字符串
+ 001E  8A 1C			    mov bl, [si]           ; 将SI指向的当前原始字符送入BL（临时存储，避免直接修改内存）
+ 0020  80 FB 41			    cmp bl, 41h            ; 比较当前字符与大写字母'A'（ASCII码41H）
+ 0023  7C 08			    jl not_b               ; 若字符ASCII码小于41H（不是大写字母），跳至not_b直接复制
+ 0025  80 FB 5A			    cmp bl, 5ah            ; 比较当前字符与大写字母'Z'（ASCII码5AH）
+ 0028  7F 03			    jg not_b               ; 若字符ASCII码大于5AH（不是大写字母），跳至not_b直接复制
+ 002A  80 C3 20			    add bl, 20h            ; 若为大写字母，加20H转换为对应小写字母（大写与小写ASCII码差值为20H）
+ 002D				not_b:                    ; 非大写字母处理：直接复制字符到输出缓冲区
+ 002D  88 1D			    mov [di], bl           ; 将处理后的字符（或原始非大写字符）存入DI指向的输出缓冲区
+ 002F  46			    inc si                 ; SI指针后移1位，指向输入字符串的下一个字符
+ 0030  47			    inc di                 ; DI指针后移1位，为存储下一个处理后字符预留位置
+ 0031  E2 EB			    loop L                 ; CX计数器减1，若CX≠0则继续循环，直至所有字符处理完成
+				    
+				    ; 输出处理后的字符串（小写转换完成的结果）
+ 0033  8D 16 0101 R		    lea dx, output         ; 将输出字符串的起始地址送入DX，为DOS显示做准备
+ 0037  C6 05 24			    mov byte ptr [di], '$' ; 在输出字符串末尾添加'$'（DOS 09H功能的字符串结束标志，必不可少）
+ 003A  B4 09			    mov ah, 09h            ; 设置DOS功能调用号为09H（显示以'$'结尾的字符串功能）
+ 003C  CD 21			    int 21h                ; 执行DOS中断，在屏幕上显示处理后的字符串
+				    
+				    ; 程序正常结束，返回DOS系统
+ 003E  B4 4C			    MOV AH,4CH             ; 设置DOS功能调用号为4CH（程序退出功能）
+ 0040  CD 21			    INT 21H                ; 执行DOS中断，释放资源并返回DOS
+
+				; 子程序：crlf - 实现屏幕换行（输出回车符+换行符）
+ 0042				crlf proc near            ; 定义近过程（子程序）crlf，仅在当前代码段内调用
+ 0042  B2 0D			    mov dl, 13             ; 将回车符ASCII码（13）送入DL（DOS字符输出的内容寄存器）
+ 0044  B4 02			    mov ah, 02h            ; 设置DOS功能调用号为02H（单个字符输出功能）
+ 0046  CD 21			    int 21h                ; 执行DOS中断，输出回车符（光标回到当前行开头）
+ 0048  B2 0A			    mov dl, 10             ; 将换行符ASCII码（10）送入DL
+ 004A  B4 02			    mov ah, 02h            ; 再次设置单个字符输出功能
+ 004C  CD 21			    int 21h                ; 执行DOS中断，输出换行符（光标下移一行）
+ 004E  C3			    ret                    ; 子程序返回，回到调用处继续执行
+ 004F				crlf endp                 ; 子程序定义结束
+ 004F				CODES ENDS
+				    END START              ; 汇编程序结束，指定程序入口为START标签
+Microsoft (R) Macro Assembler Version 6.11		    10/28/25 23:39:33
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 004F	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0300	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 0042	  CODES	Length= 000D Public
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L  . . . . . . . . . . . . . . .	L Near	 001E	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+input_max  . . . . . . . . . . .	Byte	 0000	  DATAS	
+input_real . . . . . . . . . . .	Byte	 0001	  DATAS	
+input  . . . . . . . . . . . . .	Byte	 0002	  DATAS	
+not_b  . . . . . . . . . . . . .	L Near	 002D	  CODES	
+output . . . . . . . . . . . . .	Byte	 0101	  DATAS	
+
+	   0 Warnings
+	   0 Errors

@@ -1,0 +1,129 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:23:06
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ; 数据段：无需额外数据，保持为空
+ 0000				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段：保持为空
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				start:
+ 0000  1E			    push ds         ; 保存DS寄存器
+ 0001  2B C0			    sub ax, ax      ; AX清零
+ 0003  50			    push ax         ; 压入返回地址0（程序结束时返回DOS）
+				    
+ 0004  E8 0018			    call input_bin  ; 调用input_bin：读取二进制输入并转为16位二进制数（存于BX）
+ 0007  E8 000A			    call crlf       ; 输出回车换行
+ 000A  E8 0032			    call bin_to_hex ; 调用bin_to_hex：将BX中二进制数转为十六进制输出
+ 000D  E8 0004			    call crlf       ; 输出回车换行
+				    
+ 0010  B4 4C			    mov ah, 4ch     ; DOS功能：程序终止
+ 0012  CD 21			    int 21h         ; 执行终止调用
+
+
+				; 回车换行子程序：输出回车符(13)和换行符(10)
+ 0014				crlf proc near
+ 0014  B4 02			    mov ah, 2       ; DOS功能号：字符输出
+ 0016  B2 0D			    mov dl, 13      ; 回车符ASCII码
+ 0018  CD 21			    int 21h
+ 001A  B2 0A			    mov dl, 10      ; 换行符ASCII码
+ 001C  CD 21			    int 21h
+ 001E  C3			    ret
+ 001F				crlf endp
+
+
+				; 新增子程序：读取二进制字符（0/1），转换为16位二进制数存于BX
+ 001F				input_bin proc near
+ 001F  BB 0000			    mov bx, 0       ; 初始化结果寄存器BX为0（存储转换后的二进制数）
+ 0022				read_bit:
+ 0022  B4 01			    mov ah, 1       ; DOS功能号：字符输入
+ 0024  CD 21			    int 21h         ; 读取键盘输入，字符存于AL
+				    
+ 0026  3C 30			    cmp al, '0'     ; 检查是否为'0'
+ 0028  74 06			    je is_zero
+ 002A  3C 31			    cmp al, '1'     ; 检查是否为'1'
+ 002C  74 07			    je is_one
+ 002E  EB 0E			    jmp input_end   ; 若为非0/1字符（如回车），结束输入
+				    
+ 0030				is_zero:
+ 0030  B8 0000			    mov ax, 0       ; 当前位数值为0
+ 0033  EB 03			    jmp add_to_bx
+ 0035				is_one:
+ 0035  B8 0001			    mov ax, 1       ; 当前位数值为1
+ 0038				add_to_bx:
+ 0038  D1 E3			    shl bx, 1       ; BX左移1位（等价于×2），为新位腾出最低位
+ 003A  03 D8			    add bx, ax      ; 将当前位数值加入BX（BX = BX×2 + 新位数值）
+ 003C  EB E4			    jmp read_bit    ; 继续读取下一位
+ 003E				input_end:
+ 003E  C3			    ret
+ 003F				input_bin endp
+
+
+				; 复用提供的代码：将BX中16位二进制数转为十六进制输出（4位十六进制数）
+ 003F				bin_to_hex proc near
+ 003F  B5 04			    mov ch, 4       ; 16位二进制对应4位十六进制，循环4次
+ 0041				rotate:
+ 0041  B1 04			    mov cl, 4       ; 每次处理4位，移位量为4
+ 0043  D3 C3			    rol bx, cl      ; BX循环左移4位，将待处理的4位移到低4位
+ 0045  8A C3			    mov al, bl      ; 取BX低8位到AL
+ 0047  24 0F			    and al, 0fh     ; 保留低4位（屏蔽高4位）
+ 0049  04 30			    add al, 30h     ; 转换为'0'~'9'的ASCII码（30H~39H）
+ 004B  3C 3A			    cmp al, 3ah     ; 判断是否为10~15（对应'A'~'F'）
+ 004D  7C 02			    jl printit      ; 若为0~9，直接输出
+ 004F  04 07			    add al, 7h      ; 转换为'A'~'F'的ASCII码（3AH+7H=41H即'A'）
+ 0051				printit:
+ 0051  8A D0			    mov dl, al      ; 待输出字符存入DL
+ 0053  B4 02			    mov ah, 2       ; DOS功能号：字符输出
+ 0055  CD 21			    int 21h         ; 输出当前十六进制位
+ 0057  FE CD			    dec ch          ; 计数器减1
+ 0059  75 E6			    jnz rotate      ; 未处理完4位则继续循环
+ 005B  C3			    ret
+ 005C				bin_to_hex endp
+
+
+ 005C				CODES ENDS
+				    END start       ; 程序结束，入口点为start
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:23:06
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 005C	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+bin_to_hex . . . . . . . . . . .	P Near	 003F	  CODES	Length= 001D Public
+  rotate . . . . . . . . . . . .	L Near	 0041	  CODES	
+  printit  . . . . . . . . . . .	L Near	 0051	  CODES	
+crlf . . . . . . . . . . . . . .	P Near	 0014	  CODES	Length= 000B Public
+input_bin  . . . . . . . . . . .	P Near	 001F	  CODES	Length= 0020 Public
+  read_bit . . . . . . . . . . .	L Near	 0022	  CODES	
+  is_zero  . . . . . . . . . . .	L Near	 0030	  CODES	
+  is_one . . . . . . . . . . . .	L Near	 0035	  CODES	
+  add_to_bx  . . . . . . . . . .	L Near	 0038	  CODES	
+  input_end  . . . . . . . . . .	L Near	 003E	  CODES	
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+start  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+
+	   0 Warnings
+	   0 Errors

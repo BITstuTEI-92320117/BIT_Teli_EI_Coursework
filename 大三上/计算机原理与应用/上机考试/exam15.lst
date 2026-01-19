@@ -1,0 +1,123 @@
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 20:20:15
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+ 0000 38 4A C5 83 9C B4		    num db 38H, 4AH, 0C5H, 83H, 9CH, 0B4H, 7FH, 0C4H, 05H, 0F5H  ; 定义包含10个有符号字节数的数组（补码表示）
+       7F C4 05 F5
+ 000A				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段（未定义具体内容，使用默认堆栈）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 初始化数据段寄存器
+ 0003  8E D8			    MOV DS,AX
+ 0005  BE 0000			    mov si, 0              ; 变址寄存器si初始化为0（指向数组第一个元素）
+ 0008  B9 000A			    mov cx, 10             ; 循环计数器cx设为10（数组共10个元素）
+ 000B  B8 0000			    mov ax, 0              ; ax用于统计负数的个数，初始化为0
+ 000E  BB 0000			    mov bx, 0              ; bx用于累加负数的绝对值之和，初始化为0
+ 0011				L1:                        ; 循环处理数组中的每个元素
+ 0011  8A 94 0000 R		    mov dl, num[si]        ; 将当前元素（num[si]）存入dl
+ 0015  80 FA 00			    cmp dl, 0              ; 比较当前元素与0（判断是否为负数）
+ 0018  7D 07			    jnl L2                 ; 若当前元素非负（大于等于0），跳至L2（不处理）
+ 001A  F6 DA			    neg dl                 ; 若为负数，求其绝对值（neg指令对补码取反加1，得到绝对值）
+ 001C  B6 00			    mov dh, 0              ; dh清零，使dx=dl（将8位绝对值扩展为16位，便于累加）
+ 001E  03 DA			    add bx, dx             ; 将当前负数的绝对值累加到bx
+ 0020  40			    inc ax                 ; 负数个数计数器ax加1
+ 0021				L2:                        ; 处理非负数或负数处理完成后执行
+ 0021  46			    inc si                 ; 索引si加1，指向数组下一个元素
+ 0022  E2 ED			    loop L1                ; cx减1，若不为0则继续循环
+				    
+				    ; 显示负数的个数
+ 0024  8A D0			    mov dl, al             ; al中存放负数的个数（0-10）
+ 0026  80 C2 30			    add dl, 30h            ; 转换为ASCII码（0-9对应'0'-'9'）
+ 0029  B4 02			    mov ah, 02h            ; DOS功能调用：字符输出
+ 002B  CD 21			    int 21h
+ 002D  E8 001C			    call crlf              ; 调用子程序输出回车换行
+				    
+				    ; 显示负数之和（结果为负数，先输出负号）
+ 0030  B2 2D			    mov dl, 2dh            ; 2dh是'-'的ASCII码
+ 0032  B4 02			    mov ah, 02h            ; 输出负号
+ 0034  CD 21			    int 21h
+				    
+				    ; 将负数绝对值之和（bx中的值）转换为十进制并显示（处理百位、十位、个位）
+				    ; mov cx, 10000         ; 注释：原计划处理万位，因总和绝对值小于10000，故省略
+				    ; call dec_div
+				    ; mov cx, 1000          ; 注释：原计划处理千位，因总和绝对值小于1000，故省略
+				    ; call dec_div
+ 0036  B9 0064			    mov cx, 100            ; 除数为100，提取百位
+ 0039  E8 001D			    call dec_div
+ 003C  B9 000A			    mov cx, 10             ; 除数为10，提取十位
+ 003F  E8 0017			    call dec_div
+ 0042  B9 0001			    mov cx, 1              ; 除数为1，提取个位
+ 0045  E8 0011			    call dec_div
+				    
+				    ; 程序结束，返回DOS
+ 0048  B4 4C			    MOV AH,4CH
+ 004A  CD 21			    INT 21H
+				    
+				; 子程序：输出回车换行
+ 004C				crlf proc near
+ 004C  B2 0D			    mov dl, 13             ; 回车符ASCII码（13）
+ 004E  B4 02			    mov ah, 02h            ; 输出回车
+ 0050  CD 21			    int 21h
+ 0052  B2 0A			    mov dl, 10             ; 换行符ASCII码（10）
+ 0054  B4 02			    mov ah, 02h            ; 输出换行
+ 0056  CD 21			    int 21h
+ 0058  C3			    ret
+ 0059				crlf endp
+
+				; 子程序：将bx中的数除以cx，提取一位十进制数并显示
+ 0059				dec_div proc near
+ 0059  8B C3			    mov ax, bx            ; 将累加和（bx）移入ax
+ 005B  BA 0000			    mov dx, 0             ; dx清零（扩展被除数为32位：dx:ax）
+ 005E  F7 F1			    div cx                ; ax = 商（当前位的数字），dx = 余数（剩余部分）
+ 0060  8B DA			    mov bx, dx            ; 保存余数到bx（用于下一次计算）
+ 0062  8A D0			    mov dl, al            ; 商（当前位数值）存入dl
+ 0064  80 C2 30			    add dl, 30h           ; 转换为ASCII码（0-9对应'0'-'9'）
+ 0067  B4 02			    mov ah, 02h           ; 输出该数字
+ 0069  CD 21			    int 21h
+ 006B  C3			    ret
+ 006C				dec_div endp
+
+ 006C				CODES ENDS
+				    END START
+
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 20:20:15
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 006C	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 000A	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 004C	  CODES	Length= 000D Public
+dec_div  . . . . . . . . . . . .	P Near	 0059	  CODES	Length= 0013 Public
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L1 . . . . . . . . . . . . . . .	L Near	 0011	  CODES	
+L2 . . . . . . . . . . . . . . .	L Near	 0021	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+num  . . . . . . . . . . . . . .	Byte	 0000	  DATAS	
+
+	   0 Warnings
+	   0 Errors

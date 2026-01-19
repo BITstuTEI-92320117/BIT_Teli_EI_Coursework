@@ -1,0 +1,9 @@
+function[t,st]=F2T(f,Sf)        % IFFT
+df=f(2)-f(1);                   % 频率间隔
+fmax=(f(end)-f(1)+df);          % 最大频率减最低频率加上频率间隔为带宽
+dt=1/fmax;                      % 采样间隔
+N=length(f);                    % 采样点数
+t = [0:N-1]*dt;                 % 时间分布  
+Sf=fftshift(Sf);                % 将0-fs频谱搬移到-fs/2-fs/2频谱
+st=fmax * ifft(Sf);             % 做IFFT
+st=real(st);                    % 取实部

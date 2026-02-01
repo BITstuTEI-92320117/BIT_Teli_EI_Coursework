@@ -1,0 +1,111 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/28/25 23:21:26
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+ 0000 FF			    input_max db 255       ; 输入缓冲区：最大可输入字符数（255个）
+ 0001 00			    input_real db ?        ; 实际输入字符数（由DOS 0AH功能调用自动填充）
+ 0002  00FF [			    input db 255 dup(?)    ; 存储输入的原始字符串（ASCII码形式）
+        00
+       ]
+ 0101  01FF [			    output db 511 dup(?)   ; 存储处理后的字符串（预留足够空间，因可能替换字符导致长度增加）
+        00
+       ]
+ 0300				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段（未定义具体内容，使用默认堆栈）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 初始化数据段寄存器，使DS指向数据段
+ 0003  8E D8			    MOV DS,AX
+ 0005  8D 16 0000 R		    lea dx, input_max      ; 取输入缓冲区首地址到dx
+ 0009  B4 0A			    mov ah, 0ah            ; DOS功能调用：带缓冲区的键盘输入（0AH）
+ 000B  CD 21			    int 21h                ; 执行输入，输入字符串存入input，实际长度存入input_real
+ 000D  E8 0034			    call crlf              ; 调用子程序输出回车换行，分隔输入和输出结果
+				    
+ 0010  8D 36 0002 R		    lea si, input          ; si指向输入字符串input的起始位置（源地址指针）
+ 0014  8D 3E 0101 R		    lea di, output         ; di指向输出字符串output的起始位置（目标地址指针）
+ 0018  8A 0E 0001 R		    mov cl, input_real     ; 循环次数=实际输入字符数（存入cx，ch默认0）
+ 001C				L1:                        ; 循环处理输入字符串中的每个字符
+ 001C  8A 04			    mov al, [si]           ; 将当前输入字符（si指向）存入al
+ 001E  3C 41			    cmp al, 41h            ; 比较当前字符与'A'（ASCII码41H）
+ 0020  75 0A			    jnz not_a              ; 若不是'A'，跳至not_a（直接复制字符）
+				    
+				    ; 若当前字符是'A'，替换为"CC"
+ 0022  C6 05 43			    mov byte ptr [di], 43h ; 在输出缓冲区存入'C'（ASCII码43H）
+ 0025  47			    inc di                 ; 目标指针di后移一位（准备存下一个'C'）
+ 0026  C6 05 43			    mov byte ptr [di], 43h ; 再存入一个'C'
+ 0029  47			    inc di                 ; 目标指针di再后移一位
+ 002A  EB 03			    jmp L2                 ; 跳至L2，处理下一个输入字符
+
+ 002C				not_a:                     ; 处理非'A'字符（直接复制到输出缓冲区）
+ 002C  88 05			    mov [di], al           ; 将当前输入字符复制到输出缓冲区
+ 002E  47			    inc di                 ; 目标指针di后移一位
+ 002F				L2:
+ 002F  46			    inc si                 ; 源指针si后移一位（指向 next输入字符）
+ 0030  E2 EA			    loop L1                ; cx减1，若不为0则继续循环处理下一个字符
+				    
+				    ; 输出处理后的字符串
+ 0032  8D 16 0101 R		    lea dx, output         ; dx指向输出字符串output的起始位置
+ 0036  C6 05 24			    mov byte ptr [di], '$' ; 在输出字符串末尾添加'$'（DOS 09H功能的结束标志）
+ 0039  B4 09			    mov ah, 09h            ; DOS功能调用：显示字符串（09H）
+ 003B  CD 21			    int 21h                ; 执行显示，输出处理后的结果
+ 003D  E8 0004			    call crlf              ; 输出回车换行，美化显示
+				    
+				    ; 程序结束，返回DOS
+ 0040  B4 4C			    MOV AH,4CH
+ 0042  CD 21			    INT 21H
+
+				; 子程序：crlf - 输出回车（13）和换行（10），实现换行功能
+ 0044				crlf proc near
+ 0044  B2 0D			    mov dl, 13             ; dl=13（回车符ASCII码）
+ 0046  B4 02			    mov ah, 02h            ; DOS功能调用：字符输出（02H）
+ 0048  CD 21			    int 21h                ; 输出回车
+ 004A  B2 0A			    mov dl, 10             ; dl=10（换行符ASCII码）
+ 004C  B4 02			    mov ah, 02h            ; 再次调用字符输出功能
+ 004E  CD 21			    int 21h                ; 输出换行
+ 0050  C3			    ret                    ; 返回主程序
+ 0051				crlf endp
+ 0051				CODES ENDS
+				    END START
+Microsoft (R) Macro Assembler Version 6.11		    10/28/25 23:21:26
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0051	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0300	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 0044	  CODES	Length= 000D Public
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L1 . . . . . . . . . . . . . . .	L Near	 001C	  CODES	
+L2 . . . . . . . . . . . . . . .	L Near	 002F	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+input_max  . . . . . . . . . . .	Byte	 0000	  DATAS	
+input_real . . . . . . . . . . .	Byte	 0001	  DATAS	
+input  . . . . . . . . . . . . .	Byte	 0002	  DATAS	
+not_a  . . . . . . . . . . . . .	L Near	 002C	  CODES	
+output . . . . . . . . . . . . .	Byte	 0101	  DATAS	
+
+	   0 Warnings
+	   0 Errors

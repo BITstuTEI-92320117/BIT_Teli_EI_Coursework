@@ -1,0 +1,121 @@
+Microsoft (R) Macro Assembler Version 6.11		    11/02/25 17:31:06
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ; 定义包含10个带符号字（16位）的数组num，存储示例数据（有正数也有负数）
+ 0000 FF85 01C8 FFB2 005A	    num dw -123, 456, -78, 90, -1, 2, -3, 4, -5, 6  ; 10个带符号字（示例数据）
+       FFFF 0002 FFFD
+       0004 FFFB 0006
+ 0014				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段：未定义具体栈空间，使用系统默认堆栈（用于子程序调用时保存寄存器值，如push cx）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ; 关联段寄存器：CS指向代码段（存放指令），DS指向数据段（存放数组num），SS指向堆栈段
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 将数据段基地址送入AX（DS不能直接赋值，需通过AX中转）
+ 0003  8E D8			    MOV DS,AX              ; 初始化数据段寄存器DS，确保程序能正确访问数组num
+				    
+				    ; 初始化寄存器：准备遍历数组并处理元素
+ 0005  BE 0000			    mov si, 0              ; si = 0：数组num的索引（字类型元素占2字节，后续每次+2）
+ 0008  B9 000A			    mov cx, 10             ; cx = 10：循环计数器，控制遍历数组的10个元素
+ 000B				L1:                        ; 循环入口：逐个处理数组中的元素
+ 000B  8B 9C 0000 R		    mov bx, num[si]        ; 将数组当前元素（num[si]）存入bx（暂存待处理元素）
+ 000F  83 FB 00			    cmp bx, 0              ; 比较当前元素与0（判断是否为负数）
+ 0012  7D 08			    jge L2                 ; 若当前元素≥0（非负数），跳至L2（不处理，直接继续循环）
+				    
+				    ; 若为负数：取绝对值并输出
+ 0014  F7 DB			    neg bx                 ; 对负数取绝对值（neg指令：bx = -bx，补码取反加1实现）
+ 0016  E8 000C			    call hexibin           ; 调用子程序：将bx中的绝对值以十进制形式输出
+ 0019  E8 003D			    call crlf              ; 调用子程序：输出回车换行（每个负数的绝对值单独占一行）
+
+ 001C				L2:                        ; 处理非负数或负数输出完成后：更新索引并继续循环
+ 001C  83 C6 02			    add si, 2              ; si + 2（移动到数组下一个元素，因元素为字类型占2字节）
+ 001F  E2 EA			    loop L1                ; 循环计数器cx减1，若cx≠0则继续处理下一个元素
+
+				    ; 程序结束：退出并返回DOS系统
+ 0021  B4 4C			    MOV AH,4CH             ; 设置DOS功能调用号为4CH（程序正常退出，释放资源）
+ 0023  CD 21			    INT 21H                ; 执行DOS中断：返回DOS环境
+
+				; 子程序：hexibin - 将bx中的无符号数（绝对值）转换为十进制数并输出（处理万位到个位）
+ 0025				hexibin proc near
+ 0025  51			    push cx                ; 保存主程序中的cx值（避免子程序修改外层循环计数器）
+ 0026  B9 2710			    mov cx, 10000          ; 除数=10000，用于提取万位数字
+ 0029  E8 001A			    call dec_div           ; 调用dec_div：输出万位
+ 002C  B9 03E8			    mov cx, 1000           ; 除数=1000，用于提取千位数字
+ 002F  E8 0014			    call dec_div           ; 调用dec_div：输出千位
+ 0032  B9 0064			    mov cx, 100            ; 除数=100，用于提取百位数字
+ 0035  E8 000E			    call dec_div           ; 调用dec_div：输出百位
+ 0038  B9 000A			    mov cx, 10             ; 除数=10，用于提取十位数字
+ 003B  E8 0008			    call dec_div           ; 调用dec_div：输出十位
+ 003E  B9 0001			    mov cx, 1              ; 除数=1，用于提取个位数字
+ 0041  E8 0002			    call dec_div           ; 调用dec_div：输出个位
+ 0044  59			    pop cx                 ; 恢复主程序中的cx值
+ 0045  C3			    ret                    ; 子程序返回
+ 0046				hexibin endp
+
+				; 子程序：dec_div - 执行除法提取一位十进制数字，并转换为ASCII码输出
+ 0046				dec_div proc near
+ 0046  8B C3			    mov ax, bx             ; 将待处理数（bx）送入ax（作为被除数）
+ 0048  BA 0000			    mov dx, 0              ; dx清零（扩展被除数为32位：dx:ax，避免除法溢出）
+ 004B  F7 F1			    div cx                 ; 除法运算：ax = 商（当前位数字），dx = 余数（剩余值）
+ 004D  8B DA			    mov bx, dx             ; 余数存入bx（用于下一位数字的计算）
+ 004F  8A D0			    mov dl, al             ; 商（当前位数字）送入dl（用于输出）
+ 0051  80 C2 30			    add dl, 30h            ; 数字转换为ASCII码（0→'0'，9→'9'）
+ 0054  B4 02			    mov ah, 02h            ; 设置DOS功能调用号为02H（单个字符输出）
+ 0056  CD 21			    int 21h                ; 执行DOS中断：输出当前位数字
+ 0058  C3			    ret                    ; 子程序返回
+ 0059				dec_div endp
+
+				; 子程序：crlf - 输出回车符（13）和换行符（10），实现换行功能
+ 0059				crlf proc near
+ 0059  B4 02			    mov ah, 02h            ; 设置DOS功能调用号为02H（单个字符输出）
+ 005B  B2 0D			    mov dl, 13             ; dl = 13（回车符ASCII码）：使光标回到当前行开头
+ 005D  CD 21			    int 21h                ; 输出回车符
+ 005F  B4 02			    mov ah, 02h            ; 再次设置单个字符输出功能
+ 0061  B2 0A			    mov dl, 10             ; dl = 10（换行符ASCII码）：使光标下移一行
+ 0063  CD 21			    int 21h                ; 输出换行符
+ 0065  C3			    ret                    ; 子程序返回
+ 0066				crlf endp
+
+ 0066				CODES ENDS
+				    END START              ; 汇编程序结束，指定程序入口为START标签（编译器从这里开始执行）
+Microsoft (R) Macro Assembler Version 6.11		    11/02/25 17:31:06
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0066	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0014	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 0059	  CODES	Length= 000D Public
+dec_div  . . . . . . . . . . . .	P Near	 0046	  CODES	Length= 0013 Public
+hexibin  . . . . . . . . . . . .	P Near	 0025	  CODES	Length= 0021 Public
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L1 . . . . . . . . . . . . . . .	L Near	 000B	  CODES	
+L2 . . . . . . . . . . . . . . .	L Near	 001C	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+num  . . . . . . . . . . . . . .	Word	 0000	  DATAS	
+
+	   0 Warnings
+	   0 Errors

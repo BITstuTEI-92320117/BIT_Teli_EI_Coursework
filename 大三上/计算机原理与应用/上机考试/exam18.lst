@@ -1,0 +1,116 @@
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 21:37:38
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ; 定义有符号字类型数组num，包含5个有效元素，以0作为数组结束标志（0不参与计算）
+ 0000 000F FFE0 FFD1 0012	    num dw 15, -32, -47, 18, 29, 0  ; 示例数组：元素为有符号整数，0用于标记数组结束
+       001D 0000
+ 000C 0000			    max dw ?                         ; 用于存储数组中的最大值（有符号字类型）
+ 000E 0000			    min dw ?                         ; 用于存储数组中的最小值（有符号字类型）
+ 0010 0000			    ave dw ?                         ; 用于存储数组元素的平均值（有符号字类型，整数除法结果）
+ 0012				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段：未定义具体栈空间，使用系统默认堆栈（用于临时保存寄存器值，如push cx）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ; 关联段寄存器：CS指向代码段，DS指向数据段，SS指向堆栈段
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 将数据段基地址送入AX（因DS不能直接赋值，需通过AX中转）
+ 0003  8E D8			    MOV DS,AX              ; 初始化数据段寄存器DS，确保程序能正确访问数据段中的变量
+ 0005  B8 0000			    mov ax, 0              ; AX用于累加数组元素的总和（初始化为0，支持有符号数累加）
+ 0008  BB 0000			    mov bx, 0              ; BX作为临时寄存器，暂存当前访问的数组元素
+ 000B  B9 0000			    mov cx, 0              ; CX用于统计数组中有效元素的个数（初始化为0，0不纳入计数）
+ 000E  BA 0000			    mov dx, 0              ; DX用于辅助有符号数累加：存储高位进位/借位（维持符号扩展）
+ 0011  8D 36 0000 R		    lea si, num            ; SI指向数组num的起始地址（变址寄存器，用于遍历数组元素）
+
+ 0015				L:                        ; 循环入口：遍历数组，处理每个元素直到遇到结束标志0
+ 0015  8B 1C			    mov bx, [si]           ; 将SI指向的当前数组元素（字类型）送入BX（暂存当前元素）
+ 0017  83 FB 00			    cmp bx, 0              ; 比较当前元素与0（判断是否为数组结束标志）
+ 001A  74 3A			    je exit                ; 若当前元素为0，跳至exit（结束遍历，进入结果计算环节）
+ 001C  41			    inc cx                 ; 若为有效元素（非0），元素计数器CX加1（统计有效元素数量）
+
+				    ; 处理有符号数累加：通过符号扩展确保累加结果正确（避免符号位丢失）
+ 001D  51			    push cx                ; 保存当前元素计数器CX的值（防止后续操作覆盖）
+ 001E  B9 0000			    mov cx, 0              ; 重置CX为0（用于非负数的高位扩展：符号位为0）
+ 0021  83 FB 00			    cmp bx, 0              ; 判断当前元素是否为非负数（BX ≥ 0）
+ 0024  7D 03			    jge low_add            ; 若为非负数，跳至low_add（高位扩展为0）
+ 0026  B9 FFFF			    mov cx, 0ffffh         ; 若为负数，高位扩展为0FFFFH（保持符号位为1，符合有符号数规则）
+ 0029				low_add:                  ; 执行有符号数累加（AX存低16位和，DX存高16位进位/借位）
+ 0029  03 C3			    add ax, bx             ; AX = AX + 当前元素BX（低16位累加）
+ 002B  13 D1			    adc dx, cx             ; DX = DX + CX + 进位标志CF（高16位累加，处理进位/借位）
+ 002D  59			    pop cx                 ; 恢复之前保存的元素计数器CX的值
+
+				    ; 初始化最大值和最小值（仅对第一个有效元素执行）
+ 002E  83 F9 01			    cmp cx, 1              ; 检查元素计数器CX是否为1（判断是否为第一个有效元素）
+ 0031  75 0A			    jne check_max          ; 若不是第一个元素，跳至check_max（开始比较最大值）
+ 0033  89 1E 000C R		    mov max, bx            ; 若是第一个元素，将当前元素BX赋值给max（初始化最大值）
+ 0037  89 1E 000E R		    mov min, bx            ; 同时将当前元素BX赋值给min（初始化最小值）
+ 003B  EB 14			    jmp next_elem          ; 跳至next_elem（处理下一个元素，跳过后续比较）
+
+ 003D				check_max:                ; 比较并更新最大值
+ 003D  3B 1E 000C R		    cmp bx, max            ; 比较当前元素BX与当前最大值max
+ 0041  7E 04			    jle check_min          ; 若BX ≤ max，不更新最大值，跳至check_min（比较最小值）
+ 0043  89 1E 000C R		    mov max, bx            ; 若BX > max，将当前元素BX赋值给max（更新最大值）
+
+ 0047				check_min:                ; 比较并更新最小值
+ 0047  3B 1E 000E R		    cmp bx, min            ; 比较当前元素BX与当前最小值min
+ 004B  7D 04			    jge next_elem          ; 若BX ≥ min，不更新最小值，跳至next_elem（处理下一个元素）
+ 004D  89 1E 000E R		    mov min, bx            ; 若BX < min，将当前元素BX赋值给min（更新最小值）
+
+ 0051				next_elem:                ; 准备访问下一个数组元素
+ 0051  83 C6 02			    add si, 2              ; SI加2（因数组元素为字类型，占2字节，指向后一个元素）
+ 0054  EB BF			    jmp L                  ; 跳回L（继续遍历数组）
+
+ 0056				exit:                     ; 遍历结束，计算平均值（有符号整数除法）
+ 0056  F7 F9			    idiv cx                ; 有符号除法：DX:AX（元素总和） ÷ CX（有效元素个数），商→AX（平均值）
+ 0058  A3 0010 R		    mov ave, ax            ; 将计算得到的平均值（商）存入ave变量（余数舍弃，保留整数部分）
+				    
+				    ; 以下三行将结果存入寄存器（未执行显示逻辑，仅保存结果供后续扩展）
+ 005B  A1 000C R		    mov ax, max            ; 将最大值max送入AX
+ 005E  8B 0E 000E R		    mov cx, min            ; 将最小值min送入CX
+ 0062  8B 16 0010 R		    mov dx, ave            ; 将平均值ave送入DX
+
+				    ; 程序结束，返回DOS系统
+ 0066  B4 4C			    MOV AH,4CH             ; 设置DOS功能调用号为4CH（程序退出并释放资源）
+ 0068  CD 21			    INT 21H                ; 执行DOS中断，返回DOS环境
+
+ 006A				CODES ENDS
+				    END START              ; 汇编程序结束，指定程序入口为START标签
+
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 21:37:38
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 006A	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0012	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L  . . . . . . . . . . . . . . .	L Near	 0015	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+ave  . . . . . . . . . . . . . .	Word	 0010	  DATAS	
+check_max  . . . . . . . . . . .	L Near	 003D	  CODES	
+check_min  . . . . . . . . . . .	L Near	 0047	  CODES	
+exit . . . . . . . . . . . . . .	L Near	 0056	  CODES	
+low_add  . . . . . . . . . . . .	L Near	 0029	  CODES	
+max  . . . . . . . . . . . . . .	Word	 000C	  DATAS	
+min  . . . . . . . . . . . . . .	Word	 000E	  DATAS	
+next_elem  . . . . . . . . . . .	L Near	 0051	  CODES	
+num  . . . . . . . . . . . . . .	Word	 0000	  DATAS	
+
+	   0 Warnings
+	   0 Errors

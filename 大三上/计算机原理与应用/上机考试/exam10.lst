@@ -1,0 +1,122 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:38:36
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ;定义数据段，本程序未使用数据，故为空
+ 0000				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ;定义堆栈段，本程序未显式使用堆栈，故为空
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ;定义代码段，并关联段寄存器：CS指向CODES，DS指向DATAS，SS指向STACKS
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000  1E			    start: push ds        ;保存DS寄存器值到堆栈
+ 0001  2B C0			    sub ax, ax           ;将AX清零（等价于mov ax,0）
+ 0003  50			    push ax              ;将0压入堆栈，作为程序结束时的返回地址
+ 0004				    my_repeat:           ;循环处理标签（当前被注释的jmp禁用了循环）
+ 0004  E8 0018			    call hexibin ; 16→2  ;调用hexibin过程，将十六进制输入转换为二进制（存于BX）
+ 0007  E8 000A			    call crlf ;回车换行，略;调用crlf过程，输出回车换行
+ 000A  E8 0036			    call binidec ; 2→10  ;调用binidec过程，将BX中的二进制转换为十进制输出
+ 000D  E8 0004			    call crlf            ;再次调用crlf，输出回车换行
+				    ;jmp my_repeat       ;跳回my_repeat实现重复输入输出（当前注释禁用）
+ 0010  B4 4C			    mov ah, 4ch          ;DOS功能调用号：程序终止
+ 0012  CD 21			    int 21h              ;执行DOS调用，结束程序
+				    
+ 0014				    crlf proc  near      ;定义crlf过程（近过程），功能：输出回车换行
+ 0014  B4 02			    mov ah, 2            ;DOS功能号：字符输出
+ 0016  B2 0D			    mov dl, 13           ;DL=13（回车符ASCII码）
+ 0018  CD 21			    int 21h              ;输出回车符
+ 001A  B2 0A			    mov dl, 10           ;DL=10（换行符ASCII码）
+ 001C  CD 21			    int 21h              ;输出换行符
+ 001E  C3			    ret                  ;返回调用处
+ 001F				    crlf   endp          ;crlf过程结束
+				    
+ 001F				    hexibin proc near    ;定义hexibin过程（近过程），功能：读取十六进制字符并转换为二进制（结果存于BX）
+ 001F  BB 0000			    mov bx, 0            ;初始化BX为0，用于存储转换结果
+ 0022  B4 01			    newchar: mov ah, 1   ;DOS功能号：字符输入
+ 0024  CD 21			    int 21h              ;读取键盘输入字符，存于AL
+ 0026  2C 30			    sub al, 30h          ;将ASCII码转换为数值（0-9的ASCII码减30h得对应数值）
+ 0028  7C 18			    jl exit              ;若结果小于0（非数字/字母字符，如回车），跳至exit结束转换
+ 002A  3C 0A			    cmp al, 10           ;比较数值与10
+ 002C  7C 0A			    jl add_to            ;若小于10（是0-9），跳至add_to处理
+ 002E  2C 07			    sub al, 07h          ;否则处理A-F/a-f：A(41h)减30h得11h，再减27h得0Ah（对应10），a同理
+ 0030  3C 0A			    cmp al, 0ah          ;比较数值与10（0Ah）
+ 0032  7C 0E			    jl exit              ;若小于10（非法字符），跳至exit
+ 0034  3C 10			    cmp al, 10h          ;比较数值与16（10h）
+ 0036  7D 0A			    jge exit             ;若大于等于16（非法字符），跳至exit
+ 0038  B1 04			    add_to: mov cl, 4    ;CL=4，用于移位操作
+ 003A  D3 E3			    shl bx, cl           ;BX左移4位（等价于BX=BX*16），为新输入的十六进制位留位置
+ 003C  B4 00			    mov ah, 0            ;AH清零，将AL扩展为AX（16位）
+ 003E  03 D8			    add bx, ax           ;BX = BX*16 + 新输入的数值（完成一位十六进制的累加）
+ 0040  EB E0			    jmp newchar          ;跳转至newchar，继续读取下一个字符
+ 0042  C3			    exit: ret            ;返回调用处
+ 0043				    hexibin endp         ;hexibin过程结束
+
+ 0043				    binidec proc near    ;定义binidec过程（近过程），功能：将BX中的二进制数转换为十进制并输出
+ 0043  B9 2710			    mov cx, 10000d       ;CX=10000，准备获取万位数字
+ 0046  E8 0019			    call dec_div         ;调用dec_div过程，输出万位
+ 0049  B9 03E8			    mov cx, 1000d        ;CX=1000，准备获取千位数字
+ 004C  E8 0013			    call dec_div         ;调用dec_div过程，输出千位
+ 004F  B9 0064			    mov cx, 100d         ;CX=100，准备获取百位数字
+ 0052  E8 000D			    call dec_div         ;调用dec_div过程，输出百位
+ 0055  B9 000A			    mov cx, 10d          ;CX=10，准备获取十位数字
+ 0058  E8 0007			    call dec_div         ;调用dec_div过程，输出十位
+ 005B  B9 0001			    mov cx, 1d           ;CX=1，准备获取个位数字
+ 005E  E8 0001			    call dec_div         ;调用dec_div过程，输出个位
+ 0061  C3			    ret                  ;返回调用处
+ 0062				    binidec endp         ;binidec过程结束
+				    
+ 0062				    dec_div proc near    ;定义dec_div过程（近过程），功能：将BX中的数除以CX，输出商（对应位数字），余数存回BX
+ 0062  8B C3			    mov ax, bx           ;AX=BX（将被除数存入AX）
+ 0064  BA 0000			    mov dx, 0            ;DX=0（扩展被除数为32位：DX:AX）
+ 0067  F7 F1			    div cx               ;DX:AX ÷ CX，商存于AX，余数存于DX
+ 0069  8B DA			    mov bx, dx           ;BX=余数（用于后续低位计算）
+ 006B  8A D0			    mov dl, al           ;DL=商（当前位的数字）
+ 006D  80 C2 30			    add dl, 30h          ;将数字转换为ASCII码（0的ASCII码为30h）
+ 0070  B4 02			    mov ah, 2            ;DOS功能号：字符输出
+ 0072  CD 21			    int 21h              ;输出当前位的ASCII字符
+ 0074  C3			    ret                  ;返回调用处
+ 0075				    dec_div endp         ;dec_div过程结束
+ 0075				CODES ENDS
+				    END START            ;程序结束，指定入口点为START
+
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:38:36
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0075	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+binidec  . . . . . . . . . . . .	P Near	 0043	  CODES	Length= 001F Public
+crlf . . . . . . . . . . . . . .	P Near	 0014	  CODES	Length= 000B Public
+dec_div  . . . . . . . . . . . .	P Near	 0062	  CODES	Length= 0013 Public
+hexibin  . . . . . . . . . . . .	P Near	 001F	  CODES	Length= 0024 Public
+  newchar  . . . . . . . . . . .	L Near	 0022	  CODES	
+  add_to . . . . . . . . . . . .	L Near	 0038	  CODES	
+  exit . . . . . . . . . . . . .	L Near	 0042	  CODES	
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+my_repeat  . . . . . . . . . . .	L Near	 0004	  CODES	
+start  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+
+	   0 Warnings
+	   0 Errors

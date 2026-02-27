@@ -1,0 +1,144 @@
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:46:43
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+				    ; 数据段：无需额外数据，保持为空
+ 0000				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段：无需显式使用堆栈，保持为空
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ; 关联段寄存器：CS指向代码段，DS指向数据段，SS指向堆栈段
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				start:
+ 0000  1E			    push ds         ; 保存DS寄存器初始值到堆栈
+ 0001  2B C0			    sub ax, ax      ; 将AX寄存器清零（等价于mov ax, 0）
+ 0003  50			    push ax         ; 压入0作为程序结束时的返回地址（返回DOS）
+				    
+				    ; 主流程：输入二进制→换行→输出十进制→换行
+ 0004  E8 000D			    call input_bin  ; 调用二进制输入子程序，将输入转为16位二进制数存于BX
+ 0007  E8 002A			    call crlf       ; 调用回车换行子程序，优化输出格式
+ 000A  E8 0032			    call binidec    ; 调用二进制转十进制子程序，将BX中数值转为十进制输出
+ 000D  E8 0024			    call crlf       ; 再次调用回车换行，分隔结果与命令行
+				    
+				    ; 程序终止
+ 0010  B4 4C			    mov ah, 4ch     ; DOS功能号：程序正常退出
+ 0012  CD 21			    int 21h         ; 执行DOS中断，结束程序
+
+
+				; ------------------- 复用第一个程序的子程序 -------------------
+				; 二进制输入子程序：读取键盘输入的0/1字符，转为16位二进制数存于BX
+ 0014				input_bin proc near
+ 0014  BB 0000			    mov bx, 0       ; 初始化BX为0，用于存储转换后的二进制结果
+ 0017				read_bit:
+ 0017  B4 01			    mov ah, 1       ; DOS功能号：键盘字符输入（无回显，结果存于AL）
+ 0019  CD 21			    int 21h         ; 执行中断，读取输入字符到AL
+				    
+				    ; 判断输入是否为有效二进制字符（0/1）
+ 001B  3C 30			    cmp al, '0'     ; 比较输入字符与'0'
+ 001D  74 06			    je is_zero      ; 若为'0'，跳至is_zero处理
+ 001F  3C 31			    cmp al, '1'     ; 比较输入字符与'1'
+ 0021  74 07			    je is_one       ; 若为'1'，跳至is_one处理
+ 0023  EB 0E			    jmp input_end   ; 若为非0/1字符（如回车），结束输入
+				    
+ 0025				is_zero:
+ 0025  B8 0000			    mov ax, 0       ; 当前位数值为0，存入AX
+ 0028  EB 03			    jmp add_bit     ; 跳至add_bit，将当前位加入结果
+ 002A				is_one:
+ 002A  B8 0001			    mov ax, 1       ; 当前位数值为1，存入AX
+				    
+ 002D				add_bit:
+ 002D  D1 E3			    shl bx, 1       ; BX左移1位（等价于BX = BX × 2），为新位腾出最低位
+ 002F  03 D8			    add bx, ax      ; 将当前位数值加入BX（BX = BX × 2 + 当前位）
+ 0031  EB E4			    jmp read_bit    ; 跳转回read_bit，继续读取下一位
+				    
+ 0033				input_end:
+ 0033  C3			    ret             ; 返回主程序调用处
+ 0034				input_bin endp
+
+
+				; ------------------- 复用第二个程序的子程序 -------------------
+				; 回车换行子程序：输出回车符（13）和换行符（10），优化输出格式
+ 0034				crlf proc near
+ 0034  B4 02			    mov ah, 2       ; DOS功能号：字符输出（输出DL中的字符）
+ 0036  B2 0D			    mov dl, 13      ; DL赋值为13（回车符ASCII码）
+ 0038  CD 21			    int 21h         ; 执行中断，输出回车符
+ 003A  B2 0A			    mov dl, 10      ; DL赋值为10（换行符ASCII码）
+ 003C  CD 21			    int 21h         ; 执行中断，输出换行符
+ 003E  C3			    ret             ; 返回主程序调用处
+ 003F				crlf endp
+
+
+				; 二进制转十进制子程序：将BX中16位二进制数按“万、千、百、十、个”位拆分并输出
+ 003F				binidec proc near
+ 003F  B9 2710			    mov cx, 10000d  ; CX赋值为10000（处理万位）
+ 0042  E8 0019			    call dec_div    ; 调用dec_div，计算并输出万位
+ 0045  B9 03E8			    mov cx, 1000d   ; CX赋值为1000（处理千位）
+ 0048  E8 0013			    call dec_div    ; 调用dec_div，计算并输出千位
+ 004B  B9 0064			    mov cx, 100d    ; CX赋值为100（处理百位）
+ 004E  E8 000D			    call dec_div    ; 调用dec_div，计算并输出百位
+ 0051  B9 000A			    mov cx, 10d     ; CX赋值为10（处理十位）
+ 0054  E8 0007			    call dec_div    ; 调用dec_div，计算并输出十位
+ 0057  B9 0001			    mov cx, 1d      ; CX赋值为1（处理个位）
+ 005A  E8 0001			    call dec_div    ; 调用dec_div，计算并输出个位
+ 005D  C3			    ret             ; 返回主程序调用处
+ 005E				binidec endp
+
+
+				; 十进制辅助计算子程序：计算当前位数值并输出，余数存回BX供后续位使用
+ 005E				dec_div proc near
+ 005E  8B C3			    mov ax, bx      ; 将BX中的被除数送入AX（准备除法）
+ 0060  BA 0000			    mov dx, 0       ; DX清零，将AX扩展为32位被除数（DX:AX）
+ 0063  F7 F1			    div cx          ; DX:AX ÷ CX，商（当前位数值）存AX，余数存DX
+ 0065  8B DA			    mov bx, dx      ; 将余数存入BX，供下一位计算使用
+ 0067  8A D0			    mov dl, al      ; 将当前位数值（AX）送入DL（准备输出）
+ 0069  80 C2 30			    add dl, 30h     ; 将数值转为ASCII码（0对应30H，9对应39H）
+ 006C  B4 02			    mov ah, 2       ; DOS功能号：字符输出
+ 006E  CD 21			    int 21h         ; 执行中断，输出当前位字符
+ 0070  C3			    ret             ; 返回binidec调用处
+ 0071				dec_div endp
+
+
+ 0071				CODES ENDS
+				    END start       ; 程序结束，指定入口点为start
+Microsoft (R) Macro Assembler Version 6.11		    10/26/25 20:46:43
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 0071	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+binidec  . . . . . . . . . . . .	P Near	 003F	  CODES	Length= 001F Public
+crlf . . . . . . . . . . . . . .	P Near	 0034	  CODES	Length= 000B Public
+dec_div  . . . . . . . . . . . .	P Near	 005E	  CODES	Length= 0013 Public
+input_bin  . . . . . . . . . . .	P Near	 0014	  CODES	Length= 0020 Public
+  read_bit . . . . . . . . . . .	L Near	 0017	  CODES	
+  is_zero  . . . . . . . . . . .	L Near	 0025	  CODES	
+  is_one . . . . . . . . . . . .	L Near	 002A	  CODES	
+  add_bit  . . . . . . . . . . .	L Near	 002D	  CODES	
+  input_end  . . . . . . . . . .	L Near	 0033	  CODES	
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+start  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+
+	   0 Warnings
+	   0 Errors

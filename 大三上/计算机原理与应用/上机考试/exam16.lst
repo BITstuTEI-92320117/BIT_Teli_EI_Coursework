@@ -1,0 +1,177 @@
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 20:27:59
+tempfile.asm						     Page 1 - 1
+
+
+ 0000				DATAS SEGMENT
+
+ 0000				DATAS ENDS
+
+ 0000				STACKS SEGMENT
+				    ; 堆栈段（未定义具体内容，使用默认堆栈）
+ 0000				STACKS ENDS
+
+ 0000				CODES SEGMENT
+				    ASSUME CS:CODES,DS:DATAS,SS:STACKS
+ 0000				START:
+ 0000  B8 ---- R		    MOV AX,DATAS           ; 初始化数据段寄存器，让DS指向数据段
+ 0003  8E D8			    MOV DS,AX
+				    
+ 0005  B9 000A			    mov cx, 10             ; 循环计数器cx设为10（需输入10个十进制数）
+ 0008  B8 0000			    mov ax, 0              ; ax用于统计“100以上”的数的个数，初始化为0
+ 000B  BA 0000			    mov dx, 0              ; dx拆分使用：dl统计“0-9”个数，dh统计“10-99”个数，初始均为0
+ 000E				L1:                        ; 循环入口：输入10个数并分类统计
+ 000E  E8 0032			    call input_dec         ; 调用子程序，从键盘输入一个十进制数，结果存入bx
+				    
+				    ; 判断当前输入的数（bx）所属区间，更新对应计数器
+ 0011  83 FB 09			    cmp bx, 9              ; 比较bx与9（判断是否在“0-9”区间）
+ 0014  76 07			    jbe L2                 ; 若≤9，跳至L2（更新0-9计数器）
+ 0016  83 FB 63			    cmp bx, 99             ; 比较bx与99（判断是否在“10-99”区间）
+ 0019  76 06			    jbe L3                 ; 若≤99，跳至L3（更新10-99计数器）
+ 001B  EB 08			    jmp L4                 ; 若>99，跳至L4（更新100以上计数器）
+
+ 001D				L2:                        ; 处理“0-9”区间的数
+ 001D  FE C2			    inc dl                 ; 0-9计数器dl加1
+ 001F  EB 06			    jmp L5                 ; 跳至循环控制，准备下一次输入
+ 0021				L3:                        ; 处理“10-99”区间的数
+ 0021  FE C6			    inc dh                 ; 10-99计数器dh加1
+ 0023  EB 02			    jmp L5                 ; 跳至循环控制
+ 0025				L4:                        ; 处理“100以上”区间的数
+ 0025  FE C0			    inc al                 ; 100以上计数器al加1
+ 0027				L5:                        ; 循环控制
+ 0027  E2 E5			    loop L1                ; cx减1，若不为0则继续循环输入下一个数
+
+				    ; 依次显示三个区间的统计结果
+ 0029  E8 0051			    call output            ; 显示dl（0-9的个数）
+ 002C  E8 003D			    call crlf              ; 输出回车换行，分隔结果
+ 002F  8A D6			    mov dl, dh             ; 将10-99的个数（dh）移入dl，准备显示
+ 0031  E8 0049			    call output            ; 显示10-99的个数
+ 0034  E8 0035			    call crlf              ; 回车换行
+ 0037  8A D0			    mov dl, al             ; 将100以上的个数（al）移入dl，准备显示
+ 0039  E8 0041			    call output            ; 显示100以上的个数
+ 003C  E8 002D			    call crlf              ; 回车换行
+
+				    ; 程序结束，返回DOS
+ 003F  B4 4C			    MOV AH,4CH
+ 0041  CD 21			    INT 21H
+
+				; 子程序：input_dec - 从键盘输入一个十进制数，转换为二进制数存入bx
+ 0043				input_dec proc near
+ 0043  BB 0000			    mov bx, 0              ; 初始化bx为0，用于存储输入的十进制数（二进制形式）
+ 0046  50			    push ax                ; 保存主程序中的ax值（避免子程序修改）
+ 0047  51			    push cx                ; 保存主程序中的cx值
+ 0048  52			    push dx                ; 保存主程序中的dx值
+ 0049				read_digit:                ; 循环读取单个数字字符
+ 0049  B4 01			    mov ah, 01h            ; DOS功能调用：单个字符输入（01H），输入字符存入al
+ 004B  CD 21			    int 21h                ; 执行输入
+				    
+				    ; 判断输入的字符是否为数字（'0'-'9'）
+ 004D  3C 30			    cmp al, '0'            ; 比较输入字符与'0'
+ 004F  7C 17			    jl input_end           ; 若小于'0'（非数字，如回车），结束输入
+ 0051  3C 39			    cmp al, '9'            ; 比较输入字符与'9'
+ 0053  7F 13			    jg input_end           ; 若大于'9'（非数字），结束输入
+				    
+				    ; 将数字字符转换为数值，并拼接成完整十进制数
+ 0055  2C 30			    sub al, 30h            ; ASCII码转数值（'0'-'9'→0-9）
+ 0057  B4 00			    mov ah, 0              ; 清空ah，使ax=当前数字（8位→16位扩展）
+ 0059  50			    push ax                ; 保存当前数字，避免后续操作覆盖
+				    
+ 005A  8B C3			    mov ax, bx             ; 将已拼接的数（bx）移入ax
+ 005C  B9 000A			    mov cx, 10             ; cx=10，用于实现“乘以10”（左移一位十进制）
+ 005F  F7 E1			    mul cx                 ; ax = ax × 10（已拼接的数扩大10倍，腾出个位）
+ 0061  8B D8			    mov bx, ax             ; 将扩大后的数存回bx
+				    
+ 0063  58			    pop ax                 ; 恢复当前数字到ax
+ 0064  03 D8			    add bx, ax             ; 将当前数字加到bx的个位，完成一次拼接
+ 0066  EB E1			    jmp read_digit         ; 继续读取下一个数字字符
+ 0068				input_end:                 ; 输入结束，恢复主程序寄存器
+ 0068  5A			    pop dx                 ; 恢复dx原值
+ 0069  59			    pop cx                 ; 恢复cx原值
+ 006A  58			    pop ax                 ; 恢复ax原值
+ 006B  C3			    ret                    ; 返回主程序
+ 006C				input_dec endp
+
+				; 子程序：crlf - 输出回车（13）和换行（10），实现换行功能
+ 006C				crlf proc near
+ 006C  50			    push ax                ; 保存主程序ax值
+ 006D  52			    push dx                ; 保存主程序dx值
+ 006E  B4 02			    mov ah, 02h            ; DOS功能调用：字符输出（02H）
+ 0070  B2 0D			    mov dl, 13             ; dl=13（回车符ASCII码）
+ 0072  CD 21			    int 21h                ; 输出回车
+ 0074  B4 02			    mov ah, 02h            ; 再次调用字符输出功能
+ 0076  B2 0A			    mov dl, 10             ; dl=10（换行符ASCII码）
+ 0078  CD 21			    int 21h                ; 输出换行
+ 007A  5A			    pop dx                 ; 恢复dx原值
+ 007B  58			    pop ax                 ; 恢复ax原值
+ 007C  C3			    ret                    ; 返回主程序
+ 007D				crlf endp
+
+				; 子程序：output - 将dl中的计数器值（0-10）转换为ASCII码并显示
+ 007D				output proc near
+ 007D  50			    push ax                ; 保存主程序ax值
+ 007E  52			    push dx                ; 保存主程序dx值（避免修改原计数器）
+ 007F  80 C2 30			    add dl, 30h            ; 数值转ASCII码（0-9→'0'-'9'，10→3Ah）
+				    
+				    ; 判断计数器值是否为10（因最多输入10个数，单个计数器最大为10）
+ 0082  80 FA 3A			    cmp dl, 3ah            ; 3Ah是10的ASCII码（10+30h=3Ah）
+ 0085  74 06			    je L6                  ; 若等于10，跳至L6（特殊处理，显示“10”）
+				    
+				    ; 若计数器值为0-9，直接显示单个字符
+ 0087  B4 02			    mov ah, 02h            ; 字符输出功能
+ 0089  CD 21			    int 21h                ; 显示字符
+ 008B  EB 0C			    jmp L7                 ; 跳至子程序结束，避免执行L6
+ 008D				L6:                        ; 处理计数器值为10的情况（显示“10”）
+ 008D  B2 31			    mov dl, 31h            ; dl='1'（ASCII 31h）
+ 008F  B4 02			    mov ah, 02h            ; 输出'1'
+ 0091  CD 21			    int 21h    
+ 0093  B2 30			    mov dl, 30h            ; dl='0'（ASCII 30h）
+ 0095  B4 02			    mov ah, 02h            ; 输出'0'
+ 0097  CD 21			    int 21h
+ 0099				L7:                        ; 子程序结束，恢复寄存器
+ 0099  5A			    pop dx                 ; 恢复dx原值（原计数器值）
+ 009A  58			    pop ax                 ; 恢复ax原值
+ 009B  C3			    ret                    ; 返回主程序
+ 009C				output endp 
+ 009C				CODES ENDS
+				    END START
+
+Microsoft (R) Macro Assembler Version 6.11		    11/07/25 20:27:59
+tempfile.asm						     Symbols 2 - 1
+
+
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+CODES  . . . . . . . . . . . . .	16 Bit	 009C	  Para	  Private 
+DATAS  . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+STACKS . . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+crlf . . . . . . . . . . . . . .	P Near	 006C	  CODES	Length= 0011 Public
+input_dec  . . . . . . . . . . .	P Near	 0043	  CODES	Length= 0029 Public
+  read_digit . . . . . . . . . .	L Near	 0049	  CODES	
+  input_end  . . . . . . . . . .	L Near	 0068	  CODES	
+output . . . . . . . . . . . . .	P Near	 007D	  CODES	Length= 001F Public
+  L6 . . . . . . . . . . . . . .	L Near	 008D	  CODES	
+  L7 . . . . . . . . . . . . . .	L Near	 0099	  CODES	
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+L1 . . . . . . . . . . . . . . .	L Near	 000E	  CODES	
+L2 . . . . . . . . . . . . . . .	L Near	 001D	  CODES	
+L3 . . . . . . . . . . . . . . .	L Near	 0021	  CODES	
+L4 . . . . . . . . . . . . . . .	L Near	 0025	  CODES	
+L5 . . . . . . . . . . . . . . .	L Near	 0027	  CODES	
+START  . . . . . . . . . . . . .	L Near	 0000	  CODES	
+
+	   0 Warnings
+	   0 Errors

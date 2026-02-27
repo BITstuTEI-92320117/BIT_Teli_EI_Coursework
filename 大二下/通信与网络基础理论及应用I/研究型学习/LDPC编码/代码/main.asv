@@ -1,0 +1,32 @@
+clc; clear; close all;
+%同一编码方法下，不同误码率的性能分析（根据不同的编码方式可以分析码长、码率、生成多项式、编码矩阵、译码迭代等不同参数对编码性能的影响）
+disp('同一误码率下，不同编码方法的性能分析')
+Pe = [0.01,0.02];
+l = length(Pe);
+Ber = zeros(2,l);
+for i = 0:1
+    for j = 1:l  
+        Ber(i + 1,j) = Pic(Pe(j),i,0);
+    end
+end
+figure
+plot(Pe,Ber(1,:),'b-o','LineWidth',1,'MarkerSize',2.5)
+hold on
+plot(Pe,Ber(2,:),'r-*','LineWidth',1,'MarkerSize',2.5)
+xlabel('Pe');
+ylabel('Ber');
+legend('CCSDS标准（2007版）')
+grid on;
+title('不同编码方式性能对比图');
+figure('Color','w');
+plot(c,data1);
+xlabel('(cosθ)^2');
+ylabel('P');
+hold off
+% 同一误码率下，不同编码方法的性能分析
+% disp('同一误码率下，不同编码方法的性能分析')
+% for i = 0:1
+%     Pic(0.1,i,0)
+% end
+
+

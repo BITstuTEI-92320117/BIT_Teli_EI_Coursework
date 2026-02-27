@@ -1,0 +1,21 @@
+Epoch [1/20] | Train Loss: 0.5204 | Test Loss: 0.4757 | Accuracy: 94.8%
+Epoch [2/20] | Train Loss: 0.4606 | Test Loss: 0.4715 | Accuracy: 95.1%
+Epoch [3/20] | Train Loss: 0.4884 | Test Loss: 0.4687 | Accuracy: 95.3%
+Epoch [4/20] | Train Loss: 0.4237 | Test Loss: 0.4703 | Accuracy: 95.2%
+Epoch [5/20] | Train Loss: 0.5226 | Test Loss: 0.4703 | Accuracy: 95.1%
+Epoch [6/20] | Train Loss: 0.4400 | Test Loss: 0.4712 | Accuracy: 95.1%
+Epoch [7/20] | Train Loss: 0.4475 | Test Loss: 0.4683 | Accuracy: 95.2%
+Epoch [8/20] | Train Loss: 0.4510 | Test Loss: 0.4684 | Accuracy: 95.2%
+Epoch [9/20] | Train Loss: 0.4213 | Test Loss: 0.4671 | Accuracy: 95.3%
+Epoch [10/20] | Train Loss: 0.4679 | Test Loss: 0.4701 | Accuracy: 95.1%
+Epoch [11/20] | Train Loss: 0.4038 | Test Loss: 0.4675 | Accuracy: 95.3%
+Epoch [12/20] | Train Loss: 0.4808 | Test Loss: 0.4663 | Accuracy: 95.3%
+Epoch [13/20] | Train Loss: 0.4443 | Test Loss: 0.4655 | Accuracy: 95.4%
+Epoch [14/20] | Train Loss: 0.5148 | Test Loss: 0.4659 | Accuracy: 95.3%
+Epoch [15/20] | Train Loss: 0.4189 | Test Loss: 0.4711 | Accuracy: 95.1%
+Epoch [16/20] | Train Loss: 0.4425 | Test Loss: 0.4664 | Accuracy: 95.3%
+Epoch [17/20] | Train Loss: 0.4276 | Test Loss: 0.4672 | Accuracy: 95.3%
+Epoch [18/20] | Train Loss: 0.4511 | Test Loss: 0.4671 | Accuracy: 95.3%
+Epoch [19/20] | Train Loss: 0.4383 | Test Loss: 0.4676 | Accuracy: 95.3%
+Epoch [20/20] | Train Loss: 0.4798 | Test Loss: 0.4684 | Accuracy: 95.3%
+The best epoch is 13, Accuracy is 95.4%
